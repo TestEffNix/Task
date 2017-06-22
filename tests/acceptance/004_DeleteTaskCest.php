@@ -41,7 +41,7 @@ class DeleteTaskCest
         $I->seeElement($page->taskElement(static::TEST_TASK));
         $I->waitForElementVisible($page->deleteItem(static::TEST_TASK));
         $I->click($page->deleteItem(static::TEST_TASK));
-        $I->waitForElementNotVisible($page->deleteItem(static::TEST_TASK));
+        $I->waitForElementNotVisible($page->deleteItem(static::TEST_TASK, 10));
         $I->dontSeeElement($page->taskElement(static::TEST_TASK));
         $I->dontSee(static::TEST_TASK);
     }
