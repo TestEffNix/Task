@@ -1,0 +1,90 @@
+# Tell Travis CI we are using PHP
+language: php
+
+# The platforms you wants to test on
+os:
+  - linux
+
+# Define the php versions against we want to test our code
+php:
+    - 5.6
+env:
+- DB_HOST=localhost DB_DATABASE=mysql DB_USERNAME=root DB_PASSWORD='' TEST_SUITE=Smoke_1
+- DB_HOST=localhost DB_DATABASE=mysql DB_USERNAME=root DB_PASSWORD='' TEST_SUITE=Smoke_2
+addons:
+  artifacts: true
+dist: trusty
+sudo: required
+addons:
+  packages:
+    - unzip
+
+# Disable x-debug to speed up things
+before_install: phpenv config-rm xdebug.ini
+
+
+# Install packages those will be required during build
+install:
+# Install dependencies.
+- sudo apt-get update
+- sudo apt-get install -y openjdk-8-jre-headless xvfb libxi6 libgconf-2-4
+- sudo apt-get install apache2
+
+# Install Chrome.
+- wget -N https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -P ~/
+- sudo dpkg -i --force-depends ~/google-chrome-stable_current_amd64.deb
+- sudo apt-get -f install -y
+- sudo dpkg -i --force-depends ~/google-chrome-stable_current_amd64.deb
+
+# Install ChromeDriver.
+- wget -N http://chromedriver.storage.googleapis.com/2.27/chromedriver_linux64.zip -P ~/
+- unzip ~/chromedriver_linux64.zip -d ~/
+- rm ~/chromedriver_linux64.zip
+- sudo mv -f ~/chromedriver /usr/local/share/
+- sudo chmod +x /usr/local/share/chromedriver
+- sudo ln -s /usr/local/share/chromedriver /usr/local/bin/chromedriver
+
+# Install Selenium.
+- wget -N http://selenium-release.storage.googleapis.com/3.0/selenium-server-standalone-3.0.1.jar -P ~/
+- sudo mv -f ~/selenium-server-standalone-3.0.1.jar /usr/local/share/
+- sudo chmod +x /usr/local/share/selenium-server-standalone-3.0.1.jar
+- sudo ln -s /usr/local/share/selenium-server-standalone-3.0.1.jar /usr/local/bin/selenium-server-standalone-3.0.1.jar
+
+#- "export DISPLAY=:99.0"
+#- "sh -e /etc/init.d/xvfb start"
+
+
+# Prepare test environment
+before_script:
+  - cp .env.example .env
+  - 'nohup  xvfb-run java -Dwebdriver.chrome.driver=/usr/local/bin/chromedriver -jar /usr/local/bin/selenium-server-standalone-3.0.1.jar &'
+  - sleep 3 # give xvfb some time to start
+  - "export DISPLAY=:99.0"
+  - "sh -e /etc/init.d/xvfb start"
+  - sleep 3 # give xvfb some time to start
+
+
+# Run main commands
+script:
+  - chmod -R 755 /home/travis/build/sampleOmont
+  - chmod 777 -R storage
+  - sudo /etc/init.d/apache2 start
+  - sleep 3
+  - composer install --no-interaction
+  - php artisan key:generate
+  - php artisan migrate --force
+  - php artisan serve --port=8080 &
+  - sleep 3
+  - mysqldump -u root mysql > /home/travis/build/sampleOmont/quick/tests/_data/mysql.sql
+  - "vendor/bin/codecept run tests/acceptance --steps --group $TEST_SUITE"
+
+#after_script:
+
+#after_success:
+
+#after_failure:
+
+
+# Tell Travis CI to monitor only 'master' branch
+branches:
+  only: master
